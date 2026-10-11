@@ -21,8 +21,6 @@ GIFTS = [
     discord.SelectOption(label="PS+", emoji="🎮", value="ps_plus"),
     discord.SelectOption(label="Déco de ton choix", emoji="🌸", value="deco_choice"),
     discord.SelectOption(label="Pack de ton choix", emoji="🎁", value="pack_choice"),
-    discord.SelectOption(label="Virement PayPal 50€", emoji="💳", value="paypal_50"),
-    discord.SelectOption(label="Virement PayPal 100€", emoji="💳", value="paypal_100"),
 ]
 
 class GiftSelect(discord.ui.Select):
