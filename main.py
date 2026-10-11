@@ -21,6 +21,8 @@ GIFTS = [
     discord.SelectOption(label="PS+", emoji="🎮", value="ps_plus"),
     discord.SelectOption(label="Déco de ton choix", emoji="🌸", value="deco_choice"),
     discord.SelectOption(label="Pack de ton choix", emoji="🎁", value="pack_choice"),
+    discord.SelectOption(label="Virement PayPal 50€", emoji="💳", value="paypal_50"),
+    discord.SelectOption(label="Virement PayPal 100€", emoji="💳", value="paypal_100"),
 ]
 
 class GiftSelect(discord.ui.Select):
@@ -132,7 +134,7 @@ async def setup(ctx):
 
 # Lancement du bot
 if __name__ == "__main__":
-    if DISCORD_TOKEN:
+    if :
         bot.run(DISCORD_TOKEN)
     else:
         print("Erreur : DISCORD_TOKEN n'est pas défini.")
