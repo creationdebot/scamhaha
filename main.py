@@ -9,7 +9,7 @@ intents.message_content = True
 intents.members = True
 
 # Création du bot avec le prefixe !
-bot = commands.Bot(command_prefix="!", intents=intents)
+bot = commands.Bot(command_prefix="+", intents=intents)
 
 # Récupération des variables d'environnement
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
